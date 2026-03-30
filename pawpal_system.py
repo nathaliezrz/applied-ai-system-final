@@ -212,6 +212,30 @@ class Scheduler:
                 )
         return warnings
 
+    def get_conflicts(self) -> List[dict]:
+        """Return structured conflict data for UI rendering.
+
+        Each dict has:
+            date     (datetime.date) — the day of the conflict
+            hour     (int)           — the clashing hour (0-23)
+            tasks    (List[Task])    — the tasks that overlap
+            same_pet (bool)          — True if all tasks belong to the same pet
+        """
+        slot_map: Dict[tuple, List[Task]] = defaultdict(list)
+        for task in self.owner.get_all_tasks():
+            slot_map[(task.due_date, task.hour)].append(task)
+
+        return [
+            {
+                "date": day,
+                "hour": hour,
+                "tasks": tasks,
+                "same_pet": len({t.pet.name for t in tasks}) == 1,
+            }
+            for (day, hour), tasks in sorted(slot_map.items())
+            if len(tasks) >= 2
+        ]
+
     def __repr__(self) -> str:
         """Return a readable string showing the owner and total task count."""
         return f"Scheduler(owner='{self.owner.name}', total_tasks={len(self.owner.get_all_tasks())})"
