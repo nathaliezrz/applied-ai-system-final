@@ -7,24 +7,18 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
-Core User Actions:
+UML Design / Core User Actions:
 - Add a pet
-    - Pet should hold name, breed, and a list of assigned tasks
-    - Task management lives on Pet, since Pet owns its task list
-    - Methods: addPet, deletePet (on Owner), insertTask, removeTask, changeAmount (on Pet)
-- Insert their availability schedule
-    - Availability should hold a list of blocked hours (hours the owner is unavailable)
-    - Availability is owned by Owner, and DailyPlan accesses it through Owner
-    - Methods: addHours, removeHours, alterHours
-- Insert Pet Tasks
-    - Pet tasks have a type (walk, feeding, grooming, playing) and a daily count
-    - TaskType is an enumeration to enforce valid task options
-    - Task management methods (insert, remove, change amount) belong to Pet, not PetTask
-    - PetTask only holds its own data: type and dailyCount
-- View a daily plan that accounts for tasks and availability
-    - DailyPlan references Owner (for availability) and Pet (for tasks), keeping the ownership chain intact
-    - After generation, the plan stores scheduledSlots (the ordered plan) and an explanation (why it was formatted that way)
-    - Methods: generate
+    - Pet holds name, breed, and a list of Task objects
+    - Methods: add_pet, remove_pet (on Owner), add_task, remove_task (on Pet)
+- Insert pet tasks
+    - Task represents a single activity with a description, time, frequency, and completion status
+    - Task owns its own state and behavior: mark_complete, reset
+    - Task management methods (add, remove) belong to Pet, since Pet owns its task list
+- View and manage tasks across pets
+    - Owner provides get_all_tasks() to aggregate tasks across all pets
+    - Scheduler is the central "brain" that retrieves, organizes, and manages tasks
+    - Scheduler references Owner and exposes: get_tasks (per pet), organize_tasks, mark_complete, get_pending_tasks
 
 **b. Design changes**
 
