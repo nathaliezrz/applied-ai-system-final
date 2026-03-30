@@ -1,4 +1,5 @@
 import streamlit as st
+from pawpal_system import Task, Pet, Owner, Scheduler
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -46,6 +47,14 @@ species = st.selectbox("Species", ["dog", "cat", "other"])
 st.markdown("### Tasks")
 st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
 
+# Vault check: only create the Owner and Pet once; reuse them on every rerun
+if "owner" not in st.session_state:
+    st.session_state.owner = Owner(owner_name)
+if "pet" not in st.session_state:
+    pet = Pet(pet_name, species)
+    st.session_state.owner.add_pet(pet)
+    st.session_state.pet = pet
+
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
 
@@ -53,14 +62,19 @@ col1, col2, col3 = st.columns(3)
 with col1:
     task_title = st.text_input("Task title", value="Morning walk")
 with col2:
-    duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
+    task_hour = st.number_input("Hour (0–23)", min_value=0, max_value=23, value=8)
 with col3:
-    priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+    task_freq = st.number_input("Times per day", min_value=1, max_value=10, value=1)
 
 if st.button("Add task"):
-    st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
-    )
+    try:
+        task = Task(task_title, hour=int(task_hour), frequency=int(task_freq))
+        st.session_state.pet.add_task(task)
+        st.session_state.tasks.append(
+            {"title": task.description, "hour": task.hour, "times/day": task.frequency}
+        )
+    except ValueError as e:
+        st.error(str(e))
 
 if st.session_state.tasks:
     st.write("Current tasks:")
@@ -74,15 +88,14 @@ st.subheader("Build Schedule")
 st.caption("This button should call your scheduling logic once you implement it.")
 
 if st.button("Generate schedule"):
-    st.warning(
-        "Not implemented yet. Next step: create your scheduling logic (classes/functions) and call it here."
-    )
-    st.markdown(
-        """
-Suggested approach:
-1. Design your UML (draft).
-2. Create class stubs (no logic).
-3. Implement scheduling behavior.
-4. Connect your scheduler here and display results.
-"""
-    )
+    if not st.session_state.pet.tasks:
+        st.warning("Add at least one task before generating a schedule.")
+    else:
+        scheduler = Scheduler(st.session_state.owner)
+        st.markdown(f"**Owner:** {st.session_state.owner.name} | **Pet:** {st.session_state.pet.name}")
+        st.markdown("---")
+        for task in scheduler.organize_tasks():
+            status = "✅" if task.completed else "⬜"
+            st.markdown(f"{status} **{task.hour}:00** — {task.description} ({task.frequency}x/day)")
+        pending = scheduler.get_pending_tasks()
+        st.caption(f"{len(pending)} task(s) remaining today.")

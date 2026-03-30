@@ -1,44 +1,52 @@
+from datetime import date
 from pawpal_system import Task, Pet, Owner, Scheduler
 
 
+def print_schedule(scheduler: Scheduler) -> None:
+    for task in scheduler.sort_by_time():
+        status = "[x]" if task.completed else "[ ]"
+        recur = f"  [{task.recurrence}]" if task.recurrence else ""
+        print(f"  {status} {task.due_date}  {task.hour}:00  {task.description:<22} ({task.pet.name}){recur}")
+
+
 def main():
-    # --- Owner ---
+    today = date.today()
     owner = Owner("Nathalie")
 
-    # --- Pets ---
     buddy = Pet("Buddy", "Golden Retriever")
     luna  = Pet("Luna", "Siamese Cat")
-
     owner.add_pet(buddy)
     owner.add_pet(luna)
 
-    # --- Tasks for Buddy ---
-    buddy.add_task(Task("Morning walk",  hour=7,  frequency=1))
-    buddy.add_task(Task("Feeding",       hour=8,  frequency=2))
-    buddy.add_task(Task("Evening walk",  hour=18, frequency=1))
+    # ── Normal tasks ─────────────────────────────────────────────
+    buddy.add_task(Task("Morning walk",   hour=7,  frequency=1, due_date=today))
+    buddy.add_task(Task("Evening walk",   hour=18, frequency=1, recurrence="daily", due_date=today))
+    luna.add_task(Task("Grooming",        hour=14, frequency=1, recurrence="weekly", due_date=today))
 
-    # --- Tasks for Luna ---
-    luna.add_task(Task("Feeding",        hour=9,  frequency=2))
-    luna.add_task(Task("Grooming",       hour=14, frequency=1))
+    # ── Conflict 1: same pet, same time (both Buddy at 9:00) ─────
+    buddy.add_task(Task("Feeding",        hour=9,  frequency=1, due_date=today))
+    buddy.add_task(Task("Medication",     hour=9,  frequency=1, due_date=today))
 
-    # --- Scheduler ---
-    scheduler = Scheduler(owner)
+    # ── Conflict 2: different pets, same time (both at 14:00) ────
+    buddy.add_task(Task("Vet check-in",   hour=14, frequency=1, due_date=today))
+    # Luna already has Grooming at 14:00 — this creates a cross-pet conflict
 
-    # --- Print Today's Schedule ---
-    print("=" * 40)
-    print("        PAWPAL+ — TODAY'S SCHEDULE")
-    print("=" * 40)
-    print(f"Owner: {owner.name}\n")
+    print("=" * 56)
+    print("  TODAY'S SCHEDULE")
+    print("=" * 56)
+    print_schedule(scheduler := Scheduler(owner))
 
-    for task in scheduler.organize_tasks():
-        hour_label = f"{task.hour}:00"
-        status     = "[x]" if task.completed else "[ ]"
-        print(f"  {status} {hour_label:<8} {task.description:<20} ({task.pet.name})")
+    print("\n" + "=" * 56)
+    print("  CONFLICT DETECTION")
+    print("=" * 56)
+    warnings = scheduler.detect_conflicts()
+    if warnings:
+        for w in warnings:
+            print(f"  {w}")
+    else:
+        print("  No conflicts found.")
 
-    print()
-    pending = scheduler.get_pending_tasks()
-    print(f"{len(pending)} task(s) remaining today.")
-    print("=" * 40)
+    print("=" * 56)
 
 
 if __name__ == "__main__":
