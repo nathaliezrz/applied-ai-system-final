@@ -1,76 +1,108 @@
-# PawPal+ (Module 2 Project)
+# PawPal+
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+## Original Project
 
-## Scenario
+PawPal+ was originally built in Modules 1–3 as a pet care scheduling app. The goal was to help a busy owner track tasks (walks, feeding, medication) across multiple pets, detect scheduling conflicts, and view a sorted, filterable daily plan. The core system used four classes: 'Task', 'Pet', 'Owner', and 'Scheduler.' Each with logic for recurrence, conflict detection, and time-based sorting.
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+## What It Does Now
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+PawPal+ now includes an AI Schedule Optimizer powered by the Gemini API. When conflicts are detected, the AI agent analyzes the schedule, proposes rescheduling fixes, and presents them for human review before anything changes.
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+## Architecture Overview
 
-## What you will build
-
-Your final app should:
-
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
-
-## Getting started
-
-### Setup
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+```
+User → Streamlit UI → Owner/Pet/Task Data Model → Scheduler
+                                                       ↓
+                                               AI Agent (Gemini)
+                                          plan → act → check loop
+                                                       ↓
+                                            Human Review (Apply / Discard)
+                                                       ↓
+                                            Optimised Schedule + Log
 ```
 
-### Suggested workflow
+The agent uses four tools: 'get_tasks', 'get_conflicts', 'propose_reschedule', and 'finish'. It receives the current schedule and conflicts upfront, proposes fixes, and iterates until no conflicts remain. All actions are logged to 'pawpal_agent.log'.
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+## Setup
 
-### Smarter Scheduling
-1. Added a method to sort all tasks by hour, ascending or descending
-2. Added a method to filter tasks by pet name, completion status, or both
-3. Added a recurrence field to Task to support daily and weekly repeating tasks
-4. Added a due_date field to Task to track which calendar date a task belongs to
-5. Updated mark_complete() to automatically schedule the next occurrence for recurring tasks
-6. Added a method to detect scheduling conflicts and return warning messages for same-time collisions
+```bash
+# 1. Clone and enter the project
+git clone <repo-url>
+cd applied-ai-system-final
 
-### Testing PawPal+
-To run tests: python -m pytest
-Confidence Level: 4 Stars
+# 2. Install requirements
+pip install -r requirements.txt
 
-The tests verify that tasks sort correctly by hour regardless of the order they were added, and that the sort can be reversed. They also confirm that completing a recurring task automatically schedules the next occurrence on the right date, while one off tasks do not. They also check that the scheduler correctly identifies when two or more tasks are booked at the same time, whether for the same pet or different pets, and that tasks on different dates or hours are never flagged as conflicts.
+# 3. Set your Gemini API key
+export GEMINI_API_KEY="your-key-here"
 
-### Features
+# 4. Run the app
+streamlit run app.py
 
-1. Sort by time — Tasks can be sorted chronologically by their scheduled hour, ascending or descending, regardless of the order they were added.
+# 5. (Optional) Watch the agent log in a second terminal
+tail -f pawpal_agent.log
+```
 
-2. Filter by pet or status — The scheduler can return a targeted subset of tasks filtered by pet name, completion status, or both at once.
+#Run tests:
+```bash
+python3 -m pytest tests/ -v
+```
 
-3. Daily and weekly recurrence — Tasks marked with a recurrence type automatically schedule their next occurrence when completed — one day later for daily tasks, seven days later for weekly tasks.
+## Sample Interactions
 
-4. Conflict detection — The scheduler scans all tasks grouped by date and hour, and returns warnings when two or more tasks are booked at the same time slot, distinguishing between same-pet and cross-pet overlaps.
+**Case 1 — Conflict resolved**
 
-5. Structured conflict data for the UI — Alongside plain-text warnings, the scheduler exposes conflict details as structured records so the interface can render them as interactive cards with a table of clashing tasks and a resolution tip.
+Input: Feeding at 09:00, Medication at 09:00 (conflict), Evening walk at 18:00
 
-6. Due date tracking — Every task carries a calendar date so recurring tasks, filters, and conflict checks are all scoped to the correct day rather than treating all tasks as belonging to one undated pool.
+AI output:
+```
+Proposed: 'Medication' (Mochi) 09:00 → 10:00
+Reason: Avoid conflict with Feeding scheduled at 09:00
+```
+After applying → zero conflicts, schedule updates immediately.
 
-7. Back-reference from task to pet — Each task holds a reference to the pet it belongs to, enabling the scheduler to identify ownership without traversing the full owner-pet-task hierarchy on every lookup.
+---
 
-### Demo
-<a href="/course_images/ai110/pawpal_final.png" target="_blank"><img src='/course_images/ai110>
+**Case 2 — Clean schedule**
+
+Input: Feeding at 08:00, Walk at 09:00 (no conflict)
+
+AI output: Calls `finish` immediately.
+```
+Summary: No conflicts found. Schedule is already optimal.
+```
+
+---
+
+**Case 3 — Guardrail: missing API key**
+
+Input: GEMINI_API_KEY not set
+
+Output: Yellow warning banner — "Set the GEMINI_API_KEY environment variable to enable the AI optimizer." Button is hidden; rest of app works normally.
+
+## Design Decisions
+
+| Decision | Reason | Trade-off |
+|---|---|---|
+| Proposals shown before applying | Keeps the human in control | Extra click required |
+| Context pre-loaded in first message | Cuts API calls from ~5 to ~2 per run | Agent can't re-query for live updates |
+| Gemini free tier (gemini-2.0-flash) | No cost | 1,500 requests/day limit |
+| Mocked tests for agent | No API key needed in CI | Tests verify logic, not live model behaviour |
+
+## Testing Summary
+
+**24 tests total — all passing.**
+
+- `tests/test_pawpal.py` (17 tests) — covers sorting, recurrence, and conflict detection in the scheduler
+- `tests/test_agent.py` (7 tests) — covers the agent loop using a mocked Gemini client: conflict resolution, clean-schedule no-op, invalid hour rejection, unknown task rejection, log output, and max-iteration cutoff
+
+What worked: mocking the Gemini client made agent tests fast, reliable, and runnable without a key. What didn't: the free-tier daily quota runs out quickly during active testing. What I learned: separating the agent's proposal step from the apply step made both testing and the UI much cleaner.
+
+## Reflection
+
+Building the AI agent taught me that AI reliability isn't just about the model — it's about the structure around it. Giving the agent specific tools and a clear workflow (plan → act → check) produced far more consistent results than open-ended prompting. The human review step was the most important design decision: it meant a bad AI output could never silently break the schedule. I also learned that testing AI with mocks proves the *logic* is sound, but you still need a real API call at least once to confirm the model actually follows your instructions.
+
+ ## Walk-through Link
+
+ https://www.loom.com/share/0151f1ceb7604c379cdb530fed3e2356
+ 

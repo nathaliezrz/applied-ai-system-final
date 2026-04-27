@@ -1,50 +1,43 @@
 ```mermaid
-classDiagram
+flowchart TD
+    subgraph INPUT["Input Layer"]
+        User["👤 Human User"]
+        UI["Streamlit UI\napp.py"]
+    end
 
-class Task {
-    +String description
-    +int hour
-    +int frequency
-    +Optional~str~ recurrence
-    +date due_date
-    +bool completed
-    +Optional~Pet~ pet
-    +VALID_RECURRENCES$ Set
-    +mark_complete()
-    +reset()
-}
+    subgraph CORE["Core System"]
+        DM["Owner · Pet · Task\nData Model"]
+        SCH["Scheduler\norganize · filter · detect_conflicts"]
+    end
 
-class Pet {
-    +String name
-    +String breed
-    +List~Task~ tasks
-    +add_task(task: Task)
-    +remove_task(task: Task)
-}
+    subgraph AGENT["AI Agent Loop  ↺"]
+        direction TB
+        A1["Plan\nAnalyse conflicts & pending tasks"]
+        A2["Act\nadd_task · remove_task\nget_conflicts · filter_tasks"]
+        A3["Check\nRe-run conflict detection"]
+        A1 --> A2 --> A3 --> A1
+    end
 
-class Owner {
-    +String name
-    +List~Pet~ pets
-    +add_pet(pet: Pet)
-    +remove_pet(pet: Pet)
-    +get_all_tasks() List~Task~
-}
+    subgraph OUTPUT["Output Layer"]
+        SCHED["Optimised Schedule\nsorted · filtered · metrics"]
+        REVIEW["👤 Human Review\nUser approves or overrides\nagent changes"]
+    end
 
-class Scheduler {
-    +Owner owner
-    +get_tasks(pet: Pet) List~Task~
-    +organize_tasks() List~Task~
-    +sort_by_time(reverse: bool) List~Task~
-    +mark_complete(task: Task) Optional~Task~
-    +get_pending_tasks() List~Task~
-    +filter_tasks(pet_name, completed) List~Task~
-    +detect_conflicts() List~str~
-    +get_conflicts() List~dict~
-}
+    subgraph QA["Quality Assurance"]
+        TEST["Automated Tests\ntest_pawpal.py\nverifies scheduler logic"]
+        LOG["Logging & Guardrails\nValueError · st.error\nst.success · input validation"]
+    end
 
-Owner "1" --> "1..*" Pet : manages
-Pet "1" --> "0..*" Task : has
-Task "0..*" --> "1" Pet : back-ref
-Scheduler "1" --> "1" Owner : uses
-Task ..> Task : recurrence spawns next occurrence
+    User -->|"Enter owner, pet & tasks"| UI
+    UI -->|"Instantiate objects"| DM
+    DM --> SCH
+    SCH -->|"Conflict data + task list"| AGENT
+    AGENT -->|"Proposed schedule changes"| REVIEW
+    REVIEW -->|"Confirmed"| SCH
+    SCH --> SCHED
+    SCHED --> User
+
+    TEST -.->|"Verify"| CORE
+    LOG -.->|"Guard inputs"| UI
+    LOG -.->|"Guard outputs"| AGENT
 ```
